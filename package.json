@@ -1,0 +1,24 @@
+{
+  "name": "linkedin-scraper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "npx ts-node-esm src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cld": "^2.9.1",
+    "node-libcurl": "^4.0.0",
+    "typescript": "^5.4.2",
+    "winston": "^3.12.0"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^20.11.25",
+    "ts-node": "^10.9.2"
+  }
+}
