@@ -8,6 +8,7 @@ import {
   BLACKLISTED_COMPANY_SIZE,
   BLACKLISTED_JOB_KEYWORDS,
   BLACKLISTED_JOB_NAME_KEYWORDS,
+  JOB_QUERY,
   MAX_AMOUNT_JOBS,
   MAX_FAILURE_ATTEMPTS,
   OUTPUT_FILE,
@@ -338,7 +339,7 @@ async function runLoop() {
 
     try {
       listings = await getJobListings(
-        "software engineer",
+        JOB_QUERY,
         BATCH_SIZE,
         jobsProcessed
       );

@@ -5,6 +5,7 @@ export const BATCH_SIZE = 100;
 // Limit confirmed by hand, linkedin only shows up to 40 pages of jobs.
 export const MAX_AMOUNT_JOBS = 1100;
 export const OUTPUT_FILE = "output.json";
+export const JOB_QUERY = "embedded";
 
 export const BLACKLISTED_COMPANY_SIZE = ["5,000", "1,000", "10,000", "10,001"];
 
