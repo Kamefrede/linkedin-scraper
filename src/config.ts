@@ -1,8 +1,9 @@
 export const MAX_FAILURE_ATTEMPTS = 5;
-
 export const SLEEP_MIN_MS = 1500;
 export const SLEEP_MAX_MS = 5000;
-export const OUTPUT_FILE = 'output.json'
+export const BATCH_SIZE = 100;
+export const MAX_AMOUNT_JOBS = 5000;
+export const OUTPUT_FILE = "output.json";
 
 export const BLACKLISTED_COMPANY_SIZE = ["5,000", "1,000", "10,000", "10,001"];
 
@@ -49,6 +50,15 @@ export const BLACKLISTED_JOB_NAME_KEYWORDS = [
   "security",
   "infrastructure",
   "internship",
+];
+
+export const BLACKLISTED_CATEGORY_WORDS = [
+  "staffing",
+  "recruiting",
+  "consulting",
+  "human resources",
+  "hospitality",
+  "advertising",
 ];
 
 export const REQUEST_HEADERS = [

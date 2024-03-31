@@ -3,9 +3,12 @@ import cld from "cld";
 import winston from "winston";
 import { writeFile } from "fs/promises";
 import {
+  BATCH_SIZE,
+  BLACKLISTED_CATEGORY_WORDS,
   BLACKLISTED_COMPANY_SIZE,
   BLACKLISTED_JOB_KEYWORDS,
   BLACKLISTED_JOB_NAME_KEYWORDS,
+  MAX_AMOUNT_JOBS,
   MAX_FAILURE_ATTEMPTS,
   OUTPUT_FILE,
   REQUEST_HEADERS,
@@ -13,6 +16,14 @@ import {
   SLEEP_MIN_MS,
 } from "./config.js";
 import { JobListing, FullJob } from "./types.js";
+import {
+  encodeURIComponentProperly,
+  filterEmojis,
+  includesArray,
+  pipe,
+  randomInRange,
+  sleep,
+} from "./util.js";
 
 const logger = winston.createLogger({
   level: "info",
@@ -246,10 +257,6 @@ async function getListingDetails(jobs: JobListing[]) {
   return fullJobs;
 }
 
-function encodeURIComponentProperly(uri: string): string {
-  return encodeURIComponent(uri).replace("(", "%28").replace(")", "%29");
-}
-
 function generateJobPostingCardUri(id: string): string {
   return `urn:li:fsd_jobPostingCard:(${id},JOB_DETAILS)`;
 }
@@ -274,40 +281,11 @@ function filterOutCompanySize(jobs: Partial<FullJob>[]) {
   });
 }
 
-const blacklistCategoryKeywords = [
-  "staffing",
-  "recruiting",
-  "consulting",
-  "human resources",
-  "hospitality",
-  "advertising",
-];
-
 function filterOutCategories(jobs: Partial<FullJob>[]) {
   return jobs?.filter(({ companyCategorySize }) => {
     const normalizedCategorySize =
       filterEmojis(companyCategorySize)?.toLowerCase();
-    return !includesArray(blacklistCategoryKeywords, normalizedCategorySize);
-  });
-}
-
-function includesArray(
-  needles: (string | RegExp)[],
-  haystack: string | undefined
-): boolean {
-  if (!haystack) {
-    return false;
-  }
-  return needles.some((needle) => {
-    if (typeof needle === "string") {
-      return haystack.includes(needle);
-    }
-
-    if (needle instanceof RegExp) {
-      return needle.test(haystack);
-    }
-
-    throw new Error("Invalid needle", needle);
+    return !includesArray(BLACKLISTED_CATEGORY_WORDS, normalizedCategorySize);
   });
 }
 
@@ -333,43 +311,44 @@ async function filterNonEnglishJobs(jobs: Partial<FullJob>[]) {
   return englishJobs;
 }
 
-function filterEmojis(text: string | undefined) {
-  const emojiRegex =
-    /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu;
-
-  return text?.replace(emojiRegex, "");
-}
-
-async function sleep(ms: number) {
-  await new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
-function randomInRange(min: number, max: number) {
-  min = Math.ceil(min);
-  max = Math.floor(max);
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
 async function runLoop() {
-  const batchSize = 100;
-  const goodJobs = [];
+  const goodJobs: Partial<FullJob>[] = [];
   let jobsProcessed = 0;
   let amountFailed = 0;
-  while (jobsProcessed < 5000) {
+  const pipeline = pipe(
+    getListingDetails,
+    filterOutCategories,
+    filterOutCompanySize,
+    filterUnwantedJobs,
+    filterNonEnglishJobs,
+    (job) => ({
+      applyUrl: job.applyUrl,
+      jobPostUrl: `https://www.linkedin.com/jobs/search/?currentJobId=${job.id}`,
+      jobName: job.title,
+      companyName: job.companyName,
+      description: job.description,
+      size: job.companyCategorySize,
+    })
+  );
+
+  while (jobsProcessed < MAX_AMOUNT_JOBS) {
     let listings: JobListing[] = [];
 
     try {
       listings = await getJobListings(
         "software engineer",
-        batchSize,
+        BATCH_SIZE,
         jobsProcessed
       );
     } catch (e) {
       amountFailed++;
 
-      await sleep(randomInRange(SLEEP_MIN_MS * (amountFailed + 1), SLEEP_MAX_MS * (amountFailed + 1)))
+      await sleep(
+        randomInRange(
+          SLEEP_MIN_MS * (amountFailed + 1),
+          SLEEP_MAX_MS * (amountFailed + 1)
+        )
+      );
 
       if (amountFailed < MAX_FAILURE_ATTEMPTS) {
         logger.debug("Retrying job listing fetching", e);
@@ -385,25 +364,16 @@ async function runLoop() {
     }
 
     amountFailed = 0;
-    const fullJobs = await getListingDetails(listings);
-    const categoryJobs = filterOutCategories(fullJobs);
-    const decentSizedJobs = filterOutCompanySize(categoryJobs);
-    const decentJobs = filterUnwantedJobs(decentSizedJobs);
-    const englishJobs = await filterNonEnglishJobs(decentJobs);
-
-    for (const job of englishJobs) {
-      goodJobs.push({
-        applyUrl: job.applyUrl,
-        jobPostUrl: `https://www.linkedin.com/jobs/search/?currentJobId=${job.id}`,
-        jobName: job.title,
-        companyName: job.companyName,
-        description: job.description,
-        size: job.companyCategorySize,
-      });
-    }
-    jobsProcessed += batchSize;
+    const jobs: Partial<FullJob>[] = await pipeline(listings);
+    goodJobs.concat(jobs);
+    jobsProcessed += BATCH_SIZE;
     logger.info(`Processed ${jobsProcessed} jobs`);
-    await sleep(randomInRange(SLEEP_MIN_MS, SLEEP_MAX_MS));
+    await sleep(
+      randomInRange(
+        SLEEP_MIN_MS * (amountFailed + 1),
+        SLEEP_MAX_MS * (amountFailed + 1)
+      )
+    );
   }
 
   await writeFile(OUTPUT_FILE, JSON.stringify(goodJobs, null, 4));
