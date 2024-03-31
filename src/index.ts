@@ -24,6 +24,7 @@ import {
   randomInRange,
   sleep,
 } from "./util.js";
+import { inspect } from "util";
 
 const logger = winston.createLogger({
   level: "info",
@@ -312,7 +313,7 @@ async function filterNonEnglishJobs(jobs: Partial<FullJob>[]) {
 }
 
 async function runLoop() {
-  const goodJobs: Partial<FullJob>[] = [];
+  let goodJobs: Partial<FullJob>[] = [];
   let jobsProcessed = 0;
   let amountFailed = 0;
   const pipeline = pipe(
@@ -321,14 +322,15 @@ async function runLoop() {
     filterOutCompanySize,
     filterUnwantedJobs,
     filterNonEnglishJobs,
-    (job) => ({
-      applyUrl: job.applyUrl,
-      jobPostUrl: `https://www.linkedin.com/jobs/search/?currentJobId=${job.id}`,
-      jobName: job.title,
-      companyName: job.companyName,
-      description: job.description,
-      size: job.companyCategorySize,
-    })
+    (jobs: Partial<FullJob>[]) =>
+      jobs.map((job) => ({
+        applyUrl: job.applyUrl,
+        jobPostUrl: `https://www.linkedin.com/jobs/search/?currentJobId=${job.id}`,
+        jobName: job.title,
+        companyName: job.companyName,
+        description: job.description,
+        size: job.companyCategorySize,
+      }))
   );
 
   while (jobsProcessed < MAX_AMOUNT_JOBS) {
@@ -365,7 +367,7 @@ async function runLoop() {
 
     amountFailed = 0;
     const jobs: Partial<FullJob>[] = await pipeline(listings);
-    goodJobs.concat(jobs);
+    goodJobs = goodJobs.concat(jobs);
     jobsProcessed += BATCH_SIZE;
     logger.info(`Processed ${jobsProcessed} jobs`);
     await sleep(

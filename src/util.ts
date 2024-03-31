@@ -1,3 +1,5 @@
+import { inspect } from "util";
+
 export function filterEmojis(text: string | undefined) {
   const emojiRegex =
     /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu;
@@ -11,18 +13,12 @@ export async function sleep(ms: number) {
   });
 }
 
-type Func = (...args: any[]) => any;
-
 export const pipe =
-  (...functions: Func[]) =>
+  (...functions: Function[]) =>
   async (input: any) => {
     let result = input;
     for (const func of functions) {
-      result =
-        func instanceof Promise || result instanceof Promise
-          ? await result
-          : result;
-      result = func(result);
+      result = await func(result);
     }
     return result;
   };
@@ -54,5 +50,5 @@ export function includesArray(
 }
 
 export function encodeURIComponentProperly(uri: string): string {
-    return encodeURIComponent(uri).replace("(", "%28").replace(")", "%29");
+  return encodeURIComponent(uri).replace("(", "%28").replace(")", "%29");
 }

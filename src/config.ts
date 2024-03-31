@@ -2,7 +2,8 @@ export const MAX_FAILURE_ATTEMPTS = 5;
 export const SLEEP_MIN_MS = 1500;
 export const SLEEP_MAX_MS = 5000;
 export const BATCH_SIZE = 100;
-export const MAX_AMOUNT_JOBS = 5000;
+// Limit confirmed by hand, linkedin only shows up to 40 pages of jobs.
+export const MAX_AMOUNT_JOBS = 1100;
 export const OUTPUT_FILE = "output.json";
 
 export const BLACKLISTED_COMPANY_SIZE = ["5,000", "1,000", "10,000", "10,001"];
